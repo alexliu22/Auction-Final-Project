@@ -29,15 +29,37 @@ public class AuctionItem {
 		this.currentBid = startingBid;
 		this.startingBid = startingBid;
 		this.buyNow = buyNow;
+		this.highestBidder = "";
+		this.onSale = true;
 	}
 	
-	public synchronized void placeBid(double newBid) {
-		if(currentBid > newBid) return;
+	public void placeBid(double newBid) {
+		if(currentBid > newBid || !onSale) return;
 		currentBid = newBid;
+	}
+	
+	public void bought() {
+		onSale = false;
 	}
 	
 	public double getCurrentBid() {
 		return currentBid;
+	}
+	
+	public String getName() {
+		return name;
+	}
+	
+	public double getStartingBid() {
+		return startingBid;
+	}
+	
+	public boolean getOnSale() {
+		return onSale;
+	}
+	
+	public double getBuyNow() {
+		return buyNow;
 	}
 	
 	public String toString() {
