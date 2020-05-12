@@ -6,20 +6,26 @@
  * Spring 2020
  */
 
-package assignment7;
+package final_exam;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Scanner;
+
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.Clip;
+import javax.sound.sampled.UnsupportedAudioFileException;
+
 import java.io.BufferedReader;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.lang.reflect.Type;
 import java.net.Socket;
+
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 
 import javafx.application.Application;
@@ -30,9 +36,6 @@ import javafx.geometry.Pos;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
-import javafx.scene.control.Menu;
-import javafx.scene.control.MenuBar;
-import javafx.scene.control.MenuItem;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
@@ -43,6 +46,8 @@ import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
@@ -53,13 +58,18 @@ public class Client extends Application{
 	private static String host = "127.0.0.1";
 	private BufferedReader fromServer;
 	private PrintWriter toServer;
-	private Scanner consoleInput = new Scanner(System.in);
-	
+
 	private Gson g = new Gson();
 	private Map<String, AuctionItem> auctionItems;
 	private String clientName;
 	private Double money;
+	private Map<String, Double> amtBid = new HashMap<>();
+	private Double newScroll = 0.0;
+	private Double logScroll = 0.0;
+	private String userLog = "";
+	private boolean allLogs = true;
 	
+	private Text bottomText = new Text();
 	private String selectedItem;
     private String auctionLog = "";
     private TextArea ta = new TextArea();
@@ -88,18 +98,23 @@ public class Client extends Application{
 					// This while loop reads what the server sends
 					while ((input = fromServer.readLine()) != null) {
 						if(input.charAt(0) == '0') {
+							newScroll = ta.getScrollTop();
 							Type aitype = new TypeToken<HashMap<String, AuctionItem>>(){}.getType();
 							String sec = input.substring(1);
 							auctionItems = g.fromJson(sec, aitype);
 							updateItems();
 						}
 						else if(input.charAt(0) == '1') {
+							logScroll = log.getScrollTop();
 							String sec = input.substring(1);
-							updateLog(sec);
+							auctionLog = sec;
+							if(allLogs)
+								updateLog(sec);
+							else
+								personalLog();
 						}
 						
 						System.out.println("From server: " + input);
-						processRequest(input);
 					}
 				} catch (Exception e) {
 					e.printStackTrace();
@@ -107,28 +122,7 @@ public class Client extends Application{
 			}
 		});
 
-		Thread writerThread = new Thread(new Runnable() {
-			@Override
-			public void run() {
-				while (true) {
-					// This while loop takes input from console and sends message to the server
-          			String input = consoleInput.nextLine();
-          			String[] variables = input.split(",");
-          			Message request = new Message(variables[0], variables[1], Integer.valueOf(variables[2]));
-          			GsonBuilder builder = new GsonBuilder();
-          			Gson gson = builder.create();
-          			//sendToServer(gson.toJson(request));
-          			
-				}
-			}
-		});
-
 		readerThread.start();
-		//writerThread.start();
-	}
-
-	protected void processRequest(String input) {
-		return;
 	}
 
 	protected void sendToServer(String string) {
@@ -174,7 +168,7 @@ public class Client extends Application{
 	    user.setMaxWidth(400);
 	    mid.getChildren().add(user);
 	    
-	    Text m = new Text("enter how much money you are bringing: ");
+	    Text m = new Text("enter how much money you are bringing (in $): ");
 	    m.setFont(new Font(20));
 	    mid.getChildren().add(m);
 	    
@@ -198,7 +192,7 @@ public class Client extends Application{
             	}
             	
             	clientName = user.getText();
-            	          		            	
+            	
             	secondStage.close();
             	showPrimary(primaryStage);
             }
@@ -230,22 +224,37 @@ public class Client extends Application{
 	}
 	
 	public void showPrimary(Stage primaryStage) {
+		try {
+			//InputStream in = getClass().getResourceAsStream("/assignment7/Demicheli.wav"); 
+			AudioInputStream ais = AudioSystem.getAudioInputStream(new File("Demicheli.wav"));
+			Clip clip = AudioSystem.getClip();
+			clip.open(ais);
+			clip.start();
+		} catch (Exception e) {
+			System.out.println("File not found");
+		}
+		
+		for(Map.Entry<String, AuctionItem> item: auctionItems.entrySet()) {
+			amtBid.put(item.getKey(), 0.0);
+		}
+					
 		BorderPane bPane = new BorderPane();    	    
 	    
-	    // Set Top node
+	    // Set Top node		
 	    HBox h = new HBox();
-	    Text topText = new Text("welcome to the auction, " + clientName + "!");
+	    Text topText = new Text("Welcome to the auction, " + clientName + "!");
 	    topText.setFont(new Font(50));
 	    h.setPadding(new Insets(30, 10, 10, 30));
 	    h.setAlignment(Pos.CENTER);
 	    h.getChildren().add(topText);
+	    
 	    bPane.setTop(h); 
 	    
 	    // Set Left node
 	    VBox left = new VBox();
 	    
 	    // Make dropdown menu
-	    moneyLeft.setText("You have $" + Double.toString(money) + " left.");
+	    moneyLeft.setText("You have $" + String.format("%.2f", money) + " left.");
 	    left.getChildren().add(moneyLeft);
 	    
 	    ComboBox cb = new ComboBox();
@@ -295,31 +304,31 @@ public class Client extends Application{
             			errorNotEnough();
             		}
             		else {
-            			auctionItems.get(it).placeBid(amt);
-            			money -= amt;
+        				newScroll = ta.getScrollTop();
+            			
+            			auctionItems.get(it).placeBid(amt, clientName);
+            			double displaced = amt - amtBid.get(it);
+            			
+            			money -= displaced;
+            			amtBid.replace(it, amt);
             			updateMoney();
             			
             			String ai = g.toJson(auctionItems);
             			ai = "0" + ai;
-            			synchronized(lock) {
-                			sendToServer(ai);
-            			}
+            			sendToServer(ai);
             			
-            			//updateLog(it, amt);
-            			String sec = clientName + " successfully bid " + Double.toString(amt) + " on " + it;
+            			userLog += "You successfully bid $" + String.format("%.2f", amt) + " on " + it + "\n";
+            			String sec = clientName + " successfully bid $" + String.format("%.2f", amt) + " on " + it;
             			sec = "1" + sec;
             			
-            			synchronized(lock) {
-            				sendToServer(sec);
-            			}
-            			return;
+            			sendToServer(sec);
             		}
             	}
             }
         });
 	    left.getChildren().add(buy);
 	    
-	    Button buyNow = new Button("Buy Now!!!");
+	    Button buyNow = new Button("Buy now!!!");
 	    buyNow.setOnAction(new EventHandler<ActionEvent>() {   	 
             @Override
             public void handle(ActionEvent event) {
@@ -334,23 +343,22 @@ public class Client extends Application{
             		errorCantBuy();
             		return;
             	}
-            	
+            	money -= auctionItems.get(it).getBuyNow();
+            	updateMoney();
             	auctionItems.get(it).bought();
             	
             	String ai = g.toJson(auctionItems);
             	ai = "0" + ai;
-            	synchronized(lock) {
-            		sendToServer(ai);
-            	}
+            	sendToServer(ai);
             	
+            	userLog += "You bought " + it + "!!!\n";
             	String sec = clientName + " bought " + it + "!!!";
             	sec = "1" + sec;
-            	synchronized(lock) {
-            		sendToServer(sec);
-            	}
+            	sendToServer(sec);
             }
         });
 	    left.getChildren().add(buyNow);
+	    
 	    
 	    left.setPadding(new Insets(55, 30, 40, 30));
 	    left.setSpacing(30);
@@ -374,22 +382,63 @@ public class Client extends Application{
 	    
 	    // Set Right node
 	    VBox right = new VBox();
-	    Text logMsg = new Text("Auction Log: ");
+
+	    HBox choices = new HBox();
+	    choices.setSpacing(20);
+	    ComboBox logChoice = new ComboBox();
+	    logChoice.getItems().add("All Transactions");
+	    logChoice.getItems().add("Your Transactions");
+	    logChoice.setPromptText("All Transactions");
+	    logChoice.setValue("All Transactions");
+	    
+	    choices.getChildren().add(logChoice);
+	    
+	    Button show = new Button("Show");
+	    show.setOnAction(new EventHandler<ActionEvent>() {   	 
+            @Override
+            public void handle(ActionEvent event) {
+            	String transaction = (String) logChoice.getValue();
+            	if(transaction.equals("Your Transactions")) {
+            		allLogs = false;
+            		personalLog();
+            	}
+            	else if(transaction.equals("All Transactions")) {
+            		allLogs = true;
+            		updateLog(auctionLog);         
+            	}
+            }
+        });
+	    choices.getChildren().add(show);
+	    
 	    log = new TextArea();
 	    log.setPrefHeight(500);
 	    log.setPrefWidth(500);
+	    updateLog(auctionLog);
 	    log.setFont(new Font(20));
 	    
-	    right.getChildren().add(logMsg);
+	    //right.getChildren().add(logChoice);
+	    right.getChildren().add(choices);
 	    right.getChildren().add(log);
-	    right.setSpacing(30);
+	    right.setSpacing(20);
 	    right.setPadding(new Insets(55, 50, 30, 10));
 	    bPane.setRight(right);
 	    
 	    // Set Bottom node
-	    HBox bot = new HBox();
-	    bot.getChildren().add(new Text("filler"));
+	    HBox bot = new HBox();	
+	    Text funfact = new Text("Fun fact: The Mona Lisa is essentially priceless. But you're still bidding money on it lmao.");
+	    funfact.setFont(new Font(20));
+	    bot.getChildren().add(funfact);
 	    
+	    Button exit = new Button("Exit");
+	    exit.setOnAction(new EventHandler<ActionEvent>() {   	 
+            @Override
+            public void handle(ActionEvent event) {
+            	System.exit(1);
+            }
+        });
+	    bot.getChildren().add(exit);
+	    	    
+	    bot.setSpacing(600);
 	    bot.setPadding(new Insets(30, 30, 30, 30));
 	    bPane.setBottom(bot);
 	    
@@ -405,13 +454,25 @@ public class Client extends Application{
 	private void updateItems() {
 		taString = "";
 		for(Map.Entry<String, AuctionItem> item: auctionItems.entrySet()) {
+			String time = "";
+			if(item.getValue().getTimeLeft() / 60 < 1) 
+				time = item.getValue().getTimeLeft() + "s";
+			else {
+				int m = item.getValue().getTimeLeft() / 60;
+				int s = item.getValue().getTimeLeft() % 60;
+				time = m + "m " + s + "s";
+			}
+				
 			taString += "Item: " + item.getValue().getName() + "\n" + 
-						  "Current Bid: " + Double.toString(item.getValue().getCurrentBid()) + "\n" +
-						  "Starting Bid: " + Double.toString(item.getValue().getStartingBid()) + "\n" +
-						  "Buy Now Price: " + Double.toString(item.getValue().getBuyNow()) + "\n" + 
-						  "On sale: " + item.getValue().getOnSale() + "\n\n";
+						"Desc: " + item.getValue().getDesc() + "\n" + 
+						"Current Bid: $" + String.format("%.2f", item.getValue().getCurrentBid()) + "\n" +
+						"Buy Now Price: $" + String.format("%.2f", item.getValue().getBuyNow()) + "\n" + 
+						"Highest Bidder: " + item.getValue().getHighestBidder() + "\n" +
+						"Time Left: " + time + "\n" +
+						"On sale: " + item.getValue().getOnSale() + "\n\n";
 		}
 	    ta.setText(taString);
+		ta.setScrollTop(newScroll);
 	}
 	
 	private void updateLog(String newLog) {
@@ -425,8 +486,12 @@ public class Client extends Application{
 		log.setText(formattedLog);
 	}
 	
+	private void personalLog() {
+		log.setText(userLog);
+	}
+	
 	private void updateMoney() {
-		moneyLeft.setText("You have $" + Double.toString(money) + " left.");
+		moneyLeft.setText("You have $" + String.format("%.2f", money) + " left.");
 	}
 	
 	public void errorSoldOut() {
