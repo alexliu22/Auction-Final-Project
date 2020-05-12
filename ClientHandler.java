@@ -1,4 +1,12 @@
-package assignment7;
+/*
+ * EE422C Final Project submission by
+ * Alexander Liu
+ * al47563
+ * 16320
+ * Spring 2020
+ */
+
+package final_exam;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
